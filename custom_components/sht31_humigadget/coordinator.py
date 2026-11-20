@@ -1,13 +1,15 @@
 """DataUpdateCoordinator for Sensirion SHT31 Smart Gadget. """
 from __future__ import annotations
 
+import asyncio
 import logging
 import math
 import struct
 from datetime import timedelta
 from typing import Any
 
-from bleak import BleakClient
+from bleak import BleakClient, BleakError
+from bleak_retry_connector import establish_connection
 from homeassistant.components import bluetooth
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -20,6 +22,11 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+# How many connection attempts establish_connection() should make. On top of
+# this, bleak-retry-connector retries transient errors (out of connection
+# slots, device not currently advertising, ...) with its own backoff.
+MAX_CONNECT_ATTEMPTS = 4
 
 
 def _calculate_derived_values(temperature: float, humidity: float) -> dict[str, float | None]:
@@ -105,45 +112,72 @@ class SHT31Coordinator(DataUpdateCoordinator[dict[str, Any]]):
         _LOGGER.debug("Connecting to Sensirion SHT31 at %s", self.address)
 
         try:
-            async with BleakClient(ble_device, timeout=15.0) as client:
-                if not client.is_connected:
-                    raise UpdateFailed(f"Could not connect to {self.address}")
-
-                # Read temperature (IEEE-754 32-bit float, little-endian)
-                raw_temp = await client.read_gatt_char(TEMP_CHAR_UUID)
-                temperature = round(struct.unpack("<f", raw_temp)[0], 2)
-
-                # Read humidity (IEEE-754 32-bit float, little-endian)
-                raw_hum = await client.read_gatt_char(HUM_CHAR_UUID)
-                humidity = round(struct.unpack("<f", raw_hum)[0], 2)
-
-                derived_values = _calculate_derived_values(temperature, humidity)
-
-                # Read battery level (uint8, 0-100%)
-                battery: int | None = None
-                try:
-                    raw_bat = await client.read_gatt_char(BATT_CHAR_UUID)
-                    if raw_bat:
-                        battery = int(raw_bat[0])
-                except Exception as bat_err:
-                    _LOGGER.debug("Could not read battery level from %s: %s", self.address, bat_err)
-
-                _LOGGER.debug(
-                    "SHT31 %s read success -> Temp: %s°C, Hum: %s%%, Bat: %s%%",
-                    self.address,
-                    temperature,
-                    humidity,
-                    battery,
-                )
-
-                return {
-                    "temperature": temperature,
-                    "humidity": humidity,
-                    "battery": battery,
-                    **derived_values,
-                }
-
-        except Exception as err:
+            # establish_connection() resolves the best available scanner/backend
+            # for every attempt, retries transient failures with a backoff and
+            # integrates with Home Assistant's Bluetooth connection slot
+            # management. Calling BleakClient.connect() directly bypasses all
+            # of that and fails on the first error.
+            client = await establish_connection(
+                BleakClient,
+                ble_device,
+                self.address,
+                max_attempts=MAX_CONNECT_ATTEMPTS,
+            )
+        except (BleakError, asyncio.TimeoutError) as err:
             raise UpdateFailed(
                 f"Error communicating with Sensirion SHT31 ({self.address}): {err}"
             ) from err
+
+        try:
+            return await self._async_read_data(client)
+        except Exception as err:  # noqa: BLE001 - surface any read error as UpdateFailed
+            raise UpdateFailed(
+                f"Error communicating with Sensirion SHT31 ({self.address}): {err}"
+            ) from err
+        finally:
+            try:
+                await client.disconnect()
+            except Exception as err:  # noqa: BLE001 - never mask the read result
+                _LOGGER.debug(
+                    "Error disconnecting from Sensirion SHT31 at %s: %s",
+                    self.address,
+                    err,
+                )
+
+    async def _async_read_data(self, client: BleakClient) -> dict[str, Any]:
+        """Read the sensor values from an established GATT connection."""
+        # Read temperature (IEEE-754 32-bit float, little-endian)
+        raw_temp = await client.read_gatt_char(TEMP_CHAR_UUID)
+        temperature = round(struct.unpack("<f", raw_temp)[0], 2)
+
+        # Read humidity (IEEE-754 32-bit float, little-endian)
+        raw_hum = await client.read_gatt_char(HUM_CHAR_UUID)
+        humidity = round(struct.unpack("<f", raw_hum)[0], 2)
+
+        derived_values = _calculate_derived_values(temperature, humidity)
+
+        # Read battery level (uint8, 0-100%)
+        battery: int | None = None
+        try:
+            raw_bat = await client.read_gatt_char(BATT_CHAR_UUID)
+            if raw_bat:
+                battery = int(raw_bat[0])
+        except Exception as bat_err:  # noqa: BLE001 - battery is optional
+            _LOGGER.debug(
+                "Could not read battery level from %s: %s", self.address, bat_err
+            )
+
+        _LOGGER.debug(
+            "SHT31 %s read success -> Temp: %s°C, Hum: %s%%, Bat: %s%%",
+            self.address,
+            temperature,
+            humidity,
+            battery,
+        )
+
+        return {
+            "temperature": temperature,
+            "humidity": humidity,
+            "battery": battery,
+            **derived_values,
+        }
