@@ -23,5 +23,41 @@
     "abort": {
       "already_configured": "This device is already configured in Home Assistant."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "SHT31 Smart Gadget options",
+        "description": "Configure how often Home Assistant connects to the device. Shorter intervals provide fresher data but use more battery.",
+        "data": {
+          "scan_interval": "Update interval (seconds)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "temperature": {
+        "name": "Temperature"
+      },
+      "humidity": {
+        "name": "Humidity"
+      },
+      "dew_point": {
+        "name": "Dew point"
+      },
+      "absolute_humidity": {
+        "name": "Absolute humidity"
+      },
+      "heat_index": {
+        "name": "Heat index"
+      },
+      "battery": {
+        "name": "Battery"
+      },
+      "last_seen": {
+        "name": "Last seen"
+      }
+    }
   }
 }

@@ -23,5 +23,41 @@
     "abort": {
       "already_configured": "To urządzenie jest już dodane do Home Assistant."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opcje SHT31 Smart Gadget",
+        "description": "Skonfiguruj, jak często Home Assistant łączy się z urządzeniem. Krótsze interwały zapewniają świeższe dane, ale zużywają więcej baterii.",
+        "data": {
+          "scan_interval": "Interwał aktualizacji (sekundy)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "temperature": {
+        "name": "Temperatura"
+      },
+      "humidity": {
+        "name": "Wilgotność"
+      },
+      "dew_point": {
+        "name": "Punkt rosy"
+      },
+      "absolute_humidity": {
+        "name": "Wilgotność bezwzględna"
+      },
+      "heat_index": {
+        "name": "Temperatura odczuwalna"
+      },
+      "battery": {
+        "name": "Bateria"
+      },
+      "last_seen": {
+        "name": "Ostatnio widziano"
+      }
+    }
   }
 }

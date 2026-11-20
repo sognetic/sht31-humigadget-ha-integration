@@ -1,16 +1,24 @@
-
 {
   "domain": "sht31_humigadget",
   "name": "Sensirion SHT31 Smart Gadget",
   "bluetooth": [
     {
       "local_name": "Smart Humigadget"
+    },
+    {
+      "service_uuid": "00001234-b38d-4985-720e-0f993a68ee41"
+    },
+    {
+      "service_uuid": "00002234-b38d-4985-720e-0f993a68ee41"
     }
   ],
   "codeowners": [
     "@AeddinPL"
   ],
   "config_flow": true,
+  "connectivity": [
+    "bluetooth"
+  ],
   "dependencies": [
     "bluetooth_adapters"
   ],

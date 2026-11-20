@@ -33,6 +33,7 @@ The integration creates the following sensors:
 | Absolute humidity | g/m³ | Calculated water-vapour mass per cubic metre of air |
 | Heat index | °C | Calculated apparent temperature based on temperature and relative humidity |
 | Battery | % | Battery level; diagnostic entity |
+| Last seen | timestamp | Time of the last successful reading; diagnostic entity |
 
 Derived values are calculated locally from the temperature and relative humidity readings:
 
@@ -41,6 +42,8 @@ Derived values are calculated locally from the temperature and relative humidity
 - Relative humidity is clamped to the 0–100% range for these calculations. Derived values are rounded to two decimal places.
 
 The battery reading is optional. If it cannot be read, the other sensor values can still be updated.
+
+The **Last seen** sensor records the time of the last successful reading. It intentionally remains available when the device stops responding, so you can see how long it has been offline instead of only seeing unavailable entities.
 
 The integration supports Home Assistant's Bluetooth integration, including local Bluetooth adapters and ESPHome Bluetooth Proxies.
 
@@ -79,6 +82,14 @@ If Home Assistant's Bluetooth integration can detect the device, the integration
 3. Search for **Sensirion SHT31 Smart Gadget**.
 4. Enter the sensor's Bluetooth MAC address (for example, `F3:15:B7:5E:61:C2`). You can also provide an optional device name.
 5. Submit the configuration.
+
+The MAC address can be entered with colons (`AA:BB:CC:DD:EE:FF`), hyphens (`AA-BB-CC-DD-EE-FF`) or without separators (`AABBCCDDEEFF`).
+
+### Options
+
+After setup, select **Configure** on the integration entry to change how often the device is polled. The default interval is 60 seconds; values from 15 to 3600 seconds are accepted. Shorter intervals provide fresher readings but consume more battery.
+
+Connection attempts are retried automatically with backoff, so a temporarily unreachable device does not immediately fail the update.
    
 ## Sensirion SHT31 Smart Gadget documentation
 
@@ -94,6 +105,8 @@ If Home Assistant's Bluetooth integration can detect the device, the integration
 - Close the Sensirion MyAmbience app or disconnect the phone from the sensor. The device may not accept another connection while the phone is connected.
 - Check the CR2032 battery. A weak battery can cause connection problems.
 - Move the sensor closer to the Home Assistant Bluetooth adapter or Bluetooth Proxy during setup and testing.
+
+If the **Last seen** sensor stops updating, that timestamp is the last time Home Assistant successfully read the device. The other entities become unavailable while the device is unreachable, but **Last seen** keeps the final successful contact time so you can tell whether the device has been offline for a short time or for good.
 
 ## License
 
